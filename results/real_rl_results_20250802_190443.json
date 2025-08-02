@@ -1,0 +1,35 @@
+{
+  "DQN": {
+    "algorithm": "DQN",
+    "mean_reward": "7066.427",
+    "std_reward": "65.997536",
+    "min_reward": "6970.192",
+    "max_reward": "7183.4297",
+    "total_lives_saved": 118475,
+    "total_crises_prevented": 0,
+    "training_time": 33.69366002082825,
+    "n_eval_episodes": 10
+  },
+  "PPO": {
+    "algorithm": "PPO",
+    "mean_reward": "7047.8813",
+    "std_reward": "99.26418",
+    "min_reward": "6906.513",
+    "max_reward": "7239.6416",
+    "total_lives_saved": 119194,
+    "total_crises_prevented": 0,
+    "training_time": 36.3675901889801,
+    "n_eval_episodes": 10
+  },
+  "A2C": {
+    "algorithm": "A2C",
+    "mean_reward": "6178.3887",
+    "std_reward": "63.486317",
+    "min_reward": "6099.9443",
+    "max_reward": "6312.3525",
+    "total_lives_saved": 250794,
+    "total_crises_prevented": 0,
+    "training_time": 41.90076446533203,
+    "n_eval_episodes": 10
+  }
+}
