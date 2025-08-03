@@ -27,7 +27,7 @@ except ImportError:
     SB3_AVAILABLE = False
 
 class MobileAgent:
-    """Mobile agent that moves through road networks"""
+    """Enhanced Mobile agent with communication and better movement tracking"""
     
     def __init__(self, start_pos: Tuple[float, float]):
         self.pos = list(start_pos)
@@ -39,11 +39,23 @@ class MobileAgent:
         self.fuel = 100.0
         self.communication_log = []
         
+        # Enhanced features
+        self.trail_positions = []
+        self.last_signal_time = 0
+        self.signal_cooldown = 3.0
+        self.current_command_center = None
+        self.signal_strength = 100.0
+        self.mission_status = "Patrolling"
+        self.response_received = False
+        
     def move_towards_target(self, dt: float):
-        """Move along planned path"""
+        """Enhanced movement with trail tracking"""
         if not self.path:
             return
             
+        # Store previous position for trail
+        prev_pos = self.pos.copy()
+        
         target = self.path[0]
         dx = target[0] - self.pos[0]
         dy = target[1] - self.pos[1]
@@ -65,9 +77,37 @@ class MobileAgent:
             self.pos[0] += move_x
             self.pos[1] += move_y
             
+            # Update trail (only if moved significantly)
+            move_distance = math.sqrt(move_x*move_x + move_y*move_y)
+            if move_distance > 1.0:  # Only add to trail if moved at least 1 pixel
+                self.trail_positions.append(prev_pos.copy())
+                if len(self.trail_positions) > 20:  # Limit trail length
+                    self.trail_positions.pop(0)
+            
             # Consume fuel
             self.fuel -= 0.1 * dt
             self.fuel = max(0, self.fuel)
+    
+    def send_signal_to_command(self, command_center_pos: Tuple[float, float], message: str, signal_type: str = "update"):
+        """Send communication signal to command center"""
+        current_time = time.time()
+        if current_time - self.last_signal_time >= self.signal_cooldown:
+            self.last_signal_time = current_time
+            
+            # Calculate signal strength based on distance
+            distance = math.sqrt((self.pos[0] - command_center_pos[0])**2 + 
+                               (self.pos[1] - command_center_pos[1])**2)
+            self.signal_strength = max(20, 100 - (distance / 5))  # Weaker signal over distance
+            
+            return {
+                'from_pos': self.pos.copy(),
+                'to_pos': command_center_pos,
+                'message': message,
+                'type': signal_type,
+                'timestamp': current_time,
+                'strength': self.signal_strength
+            }
+        return None
 
 class LiveMobileVisualization:
     """Visualize trained RL models controlling mobile crisis agent"""
@@ -98,7 +138,7 @@ class LiveMobileVisualization:
             'land': (40, 80, 40)
         }
         
-        # Map setup (Africa focus: Cameroon, DRC, Sudan)
+        # Enhanced Map setup (Africa focus: Cameroon, DRC, Sudan)
         self.map_area = (50, 100, 800, 600)  # x, y, width, height
         
         # Real cities and coordinates (scaled to map)
@@ -124,12 +164,46 @@ class LiveMobileVisualization:
             'Nyala': (550, 280),       # Darfur
         }
         
-        # Country regions
+        # Enhanced Country regions with better visualization
         self.countries = {
-            'Cameroon': {'color': (100, 150, 100), 'cities': ['Yaoundé', 'Douala', 'Garoua', 'Bamenda']},
-            'DR Congo': {'color': (150, 100, 100), 'cities': ['Kinshasa', 'Lubumbashi', 'Kisangani', 'Goma', 'Bukavu']},
-            'Sudan': {'color': (100, 100, 150), 'cities': ['Khartoum', 'Port Sudan', 'Kassala', 'El Obeid', 'Nyala']}
+            'Cameroon': {
+                'color': (100, 150, 100), 
+                'border_color': (150, 200, 150),
+                'cities': ['Yaoundé', 'Douala', 'Garoua', 'Bamenda'],
+                'capital': 'Yaoundé',
+                'region_bounds': [(260, 240), (340, 240), (340, 340), (260, 340)]
+            },
+            'DR Congo': {
+                'color': (150, 100, 100), 
+                'border_color': (200, 150, 150),
+                'cities': ['Kinshasa', 'Lubumbashi', 'Kisangani', 'Goma', 'Bukavu'],
+                'capital': 'Kinshasa',
+                'region_bounds': [(380, 300), (500, 300), (500, 470), (380, 470)]
+            },
+            'Sudan': {
+                'color': (100, 100, 150), 
+                'border_color': (150, 150, 200),
+                'cities': ['Khartoum', 'Port Sudan', 'Kassala', 'El Obeid', 'Nyala'],
+                'capital': 'Khartoum',
+                'region_bounds': [(540, 160), (670, 160), (670, 300), (540, 300)]
+            }
         }
+        
+        # Command centers (headquarters/stations)
+        self.command_centers = {
+            'African Union HQ': {'pos': (720, 400), 'color': (255, 215, 0), 'coverage': 200},
+            'UN Emergency': {'pos': (150, 200), 'color': (0, 150, 255), 'coverage': 150},
+            'Regional Command': {'pos': (500, 500), 'color': (255, 100, 255), 'coverage': 180}
+        }
+        
+        # Communication system
+        self.active_signals = []  # Agent to station signals
+        self.active_responses = []  # Station to agent responses
+        self.signal_history = []
+        
+        # Agent trail for better movement visualization
+        self.agent_trail = []
+        self.max_trail_length = 20
         
         # Road network (simplified)
         self.roads = [
@@ -143,8 +217,11 @@ class LiveMobileVisualization:
             ('Bamenda', 'Kinshasa'), ('Goma', 'El Obeid')
         ]
         
-        # Initialize agent
+        # Initialize enhanced agent
         self.agent = MobileAgent(self.cities['Yaoundé'])
+        self.agent.trail_positions = []  # For movement trail
+        self.agent.last_signal_time = 0
+        self.agent.signal_cooldown = 3.0  # Signal every 3 seconds
         
         # RL Environment and Model
         self.env = None
@@ -422,7 +499,7 @@ class LiveMobileVisualization:
                         self.agent.communication_log.pop(0)
     
     def update(self, dt: float):
-        """Update simulation"""
+        """Enhanced simulation update with communication"""
         self.animation_time += dt
         self.pulse_time += dt * 3
         
@@ -439,6 +516,9 @@ class LiveMobileVisualization:
         # Check crisis detection
         self.check_crisis_detection()
         
+        # Update communication system
+        self.update_communications()
+        
         # Update performance metrics
         current_time = time.time()
         resolved_crises = [c for c in self.active_crises if c.get('responding', False) and 
@@ -449,6 +529,17 @@ class LiveMobileVisualization:
                 self.active_crises.remove(crisis)
                 self.total_crises_resolved += 1
                 self.total_lives_saved += crisis['lives_at_risk']
+                
+                # Send completion signal
+                closest_center = self.find_closest_command_center()
+                if closest_center:
+                    signal = self.agent.send_signal_to_command(
+                        self.command_centers[closest_center]['pos'],
+                        f"Crisis resolved at {crisis['location']} - {crisis['lives_at_risk']} lives saved",
+                        "success"
+                    )
+                    if signal:
+                        self.active_signals.append(signal)
     
     def render(self):
         """Render the visualization"""
@@ -461,6 +552,7 @@ class LiveMobileVisualization:
         self._render_communication_panel()
         self._render_performance_panel()
         self._render_header()
+        self._render_legend()
     
     def _render_header(self):
         """Render main header"""
@@ -471,23 +563,61 @@ class LiveMobileVisualization:
         self.screen.blit(subtitle, (20, 50))
     
     def _render_map(self):
-        """Render the main map with agent and crises"""
+        """Enhanced map rendering with better regional visualization"""
         map_x, map_y, map_w, map_h = self.map_area
         
         # Map background
         pygame.draw.rect(self.screen, self.colors['land'], (map_x, map_y, map_w, map_h))
         pygame.draw.rect(self.screen, self.colors['accent'], (map_x, map_y, map_w, map_h), 2)
         
-        # Country regions (subtle background)
+        # Enhanced Country regions with proper borders and labels
         for country, data in self.countries.items():
-            cities = data['cities']
-            if len(cities) >= 3:
-                points = [self.cities[city] for city in cities[:4]]  # Use first 4 cities for polygon
+            # Draw region background
+            if 'region_bounds' in data:
                 try:
-                    color = tuple(max(0, min(255, int(c * 0.3))) for c in data['color'])
-                    pygame.draw.polygon(self.screen, color, points)
-                except (ValueError, OverflowError):
-                    pass  # Skip if color calculation fails
+                    region_color = tuple(max(0, min(255, int(c * 0.4))) for c in data['color'])
+                    border_color = data.get('border_color', data['color'])
+                    
+                    # Fill region
+                    pygame.draw.polygon(self.screen, region_color, data['region_bounds'])
+                    # Border
+                    pygame.draw.polygon(self.screen, border_color, data['region_bounds'], 3)
+                    
+                    # Country label
+                    center_x = sum(p[0] for p in data['region_bounds']) // len(data['region_bounds'])
+                    center_y = sum(p[1] for p in data['region_bounds']) // len(data['region_bounds'])
+                    
+                    country_label = self.font_medium.render(country, True, self.colors['text'])
+                    label_rect = country_label.get_rect(center=(center_x, center_y - 20))
+                    
+                    # Background for label
+                    pygame.draw.rect(self.screen, self.colors['panel_bg'], 
+                                   (label_rect.x - 5, label_rect.y - 2, label_rect.width + 10, label_rect.height + 4))
+                    self.screen.blit(country_label, label_rect)
+                    
+                except (ValueError, OverflowError, TypeError):
+                    pass  # Skip if rendering fails
+        
+        # Command Centers
+        for center_name, center_data in self.command_centers.items():
+            pos = center_data['pos']
+            color = center_data['color']
+            coverage = center_data['coverage']
+            
+            # Coverage area (subtle)
+            coverage_color = tuple(max(0, min(255, int(c * 0.1))) for c in color)
+            pygame.draw.circle(self.screen, coverage_color, pos, coverage, 1)
+            
+            # Command center building
+            pygame.draw.rect(self.screen, color, (pos[0]-8, pos[1]-8, 16, 16))
+            pygame.draw.rect(self.screen, self.colors['text'], (pos[0]-8, pos[1]-8, 16, 16), 2)
+            
+            # Antenna
+            pygame.draw.line(self.screen, color, (pos[0], pos[1]-8), (pos[0], pos[1]-20), 3)
+            
+            # Label
+            label = self.font_small.render(center_name, True, color)
+            self.screen.blit(label, (pos[0] + 12, pos[1] - 10))
         
         # Road network
         for road in self.roads:
@@ -537,8 +667,31 @@ class LiveMobileVisualization:
                 end = self.agent.path[i + 1]
                 pygame.draw.line(self.screen, self.colors['route'], start, end, 3)
         
-        # Agent
+        # Enhanced Agent visualization with trail
         agent_pos = tuple(map(int, self.agent.pos))
+        
+        # Agent movement trail
+        if len(self.agent.trail_positions) > 1:
+            for i in range(len(self.agent.trail_positions) - 1):
+                start_pos = tuple(map(int, self.agent.trail_positions[i]))
+                end_pos = tuple(map(int, self.agent.trail_positions[i + 1]))
+                
+                # Fade trail based on age
+                alpha = max(50, 255 - (len(self.agent.trail_positions) - i) * 12)
+                trail_color = (*self.colors['agent'][:3], alpha)
+                
+                try:
+                    pygame.draw.line(self.screen, self.colors['agent'], start_pos, end_pos, max(1, 4 - i//3))
+                except (ValueError, OverflowError):
+                    pass
+        
+        # Communication signals (agent to stations)
+        for signal in self.active_signals:
+            self._render_signal(signal)
+        
+        # Station responses
+        for response in self.active_responses:
+            self._render_response(response)
         
         # Agent glow effect
         glow_radius = int(20 + abs(math.sin(self.animation_time * 2)) * 8)
@@ -564,15 +717,20 @@ class LiveMobileVisualization:
                 end_y = agent_pos[1] + dy * 15
                 pygame.draw.line(self.screen, self.colors['text'], agent_pos, (int(end_x), int(end_y)), 3)
         
-        # Agent label
-        agent_label = self.font_small.render("🚁 Crisis Response Agent", True, self.colors['agent'])
+        # Enhanced agent label with status
+        agent_label = self.font_small.render(f"🚁 {self.agent.mission_status}", True, self.colors['agent'])
         self.screen.blit(agent_label, (agent_pos[0] - 60, agent_pos[1] - 30))
         
-        # Fuel indicator
+        # Fuel and signal strength indicators
         fuel_text = f"Fuel: {self.agent.fuel:.0f}%"
         fuel_color = self.colors['stable'] if self.agent.fuel > 50 else (self.colors['warning'] if self.agent.fuel > 20 else self.colors['crisis'])
         fuel_surface = self.font_small.render(fuel_text, True, fuel_color)
         self.screen.blit(fuel_surface, (agent_pos[0] - 30, agent_pos[1] + 20))
+        
+        signal_text = f"Signal: {self.agent.signal_strength:.0f}%"
+        signal_color = self.colors['stable'] if self.agent.signal_strength > 70 else (self.colors['warning'] if self.agent.signal_strength > 30 else self.colors['crisis'])
+        signal_surface = self.font_small.render(signal_text, True, signal_color)
+        self.screen.blit(signal_surface, (agent_pos[0] - 30, agent_pos[1] + 35))
     
     def _render_neural_panel(self):
         """Render neural network activity panel"""
@@ -808,6 +966,186 @@ class LiveMobileVisualization:
         print(f"   Lives Saved: {self.total_lives_saved:,}")
         print(f"   Crises Resolved: {self.total_crises_resolved}")
         print(f"   Episodes: {self.episode_count}")
+
+    def update_communications(self):
+        """Update communication signals and responses"""
+        current_time = time.time()
+        
+        # Send regular status updates
+        if current_time - self.agent.last_signal_time >= self.agent.signal_cooldown:
+            closest_center = self.find_closest_command_center()
+            if closest_center:
+                message = f"Status: {self.agent.mission_status} | Fuel: {self.agent.fuel:.0f}% | Crises: {len(self.active_crises)}"
+                signal = self.agent.send_signal_to_command(
+                    self.command_centers[closest_center]['pos'],
+                    message,
+                    "status"
+                )
+                if signal:
+                    self.active_signals.append(signal)
+                    
+                    # Generate response after delay
+                    response_delay = random.uniform(0.5, 1.5)
+                    response = {
+                        'from_pos': self.command_centers[closest_center]['pos'],
+                        'to_pos': self.agent.pos.copy(),
+                        'message': self.generate_command_response(),
+                        'timestamp': current_time + response_delay,
+                        'center_name': closest_center
+                    }
+                    self.active_responses.append(response)
+        
+        # Update and remove old signals
+        self.active_signals = [s for s in self.active_signals if current_time - s['timestamp'] < 3.0]
+        self.active_responses = [r for r in self.active_responses if current_time - r['timestamp'] < 3.0]
+    
+    def find_closest_command_center(self):
+        """Find the closest command center to the agent"""
+        min_distance = float('inf')
+        closest_center = None
+        
+        for center_name, center_data in self.command_centers.items():
+            distance = math.sqrt((self.agent.pos[0] - center_data['pos'][0])**2 + 
+                               (self.agent.pos[1] - center_data['pos'][1])**2)
+            if distance < min_distance:
+                min_distance = distance
+                closest_center = center_name
+        
+        return closest_center
+    
+    def generate_command_response(self):
+        """Generate realistic command center responses"""
+        responses = [
+            "Roger, continue mission",
+            "Status acknowledged, proceed", 
+            "Good work, agent. Stay alert",
+            "Backup en route if needed",
+            "Priority: civilian safety first",
+            "Weather clear, proceed",
+            "Intel updated, check map",
+            "Fuel station available nearby"
+        ]
+        return random.choice(responses)
+    
+    def _render_signal(self, signal):
+        """Render communication signal from agent to station"""
+        current_time = time.time()
+        signal_age = current_time - signal['timestamp']
+        
+        if signal_age > 3.0:  # Signal duration
+            return
+        
+        # Signal animation
+        progress = signal_age / 3.0
+        
+        start_pos = tuple(map(int, signal['from_pos']))
+        end_pos = tuple(map(int, signal['to_pos']))
+        
+        # Current signal position
+        current_x = start_pos[0] + (end_pos[0] - start_pos[0]) * progress
+        current_y = start_pos[1] + (end_pos[1] - start_pos[1]) * progress
+        current_pos = (int(current_x), int(current_y))
+        
+        # Signal visualization
+        signal_color = self.colors['neural'] if signal['type'] == 'status' else self.colors['crisis']
+        
+        # Signal beam
+        pygame.draw.line(self.screen, signal_color, start_pos, current_pos, 2)
+        
+        # Signal pulse
+        pulse_radius = int(5 + abs(math.sin(current_time * 10)) * 3)
+        pygame.draw.circle(self.screen, signal_color, current_pos, pulse_radius)
+        
+        # Signal type indicator
+        if signal['type'] == 'status':
+            icon = "📡"
+        elif signal['type'] == 'crisis':
+            icon = "🚨"
+        else:
+            icon = "✅"
+        
+        signal_text = self.font_small.render(icon, True, signal_color)
+        self.screen.blit(signal_text, (current_pos[0] - 8, current_pos[1] - 8))
+    
+    def _render_response(self, response):
+        """Render response signal from station to agent"""
+        current_time = time.time()
+        
+        if current_time < response['timestamp']:
+            return  # Not yet sent
+        
+        response_age = current_time - response['timestamp']
+        if response_age > 3.0:  # Response duration
+            return
+        
+        # Response animation
+        progress = response_age / 3.0
+        
+        start_pos = tuple(map(int, response['from_pos']))
+        end_pos = tuple(map(int, response['to_pos']))
+        
+        # Current response position
+        current_x = start_pos[0] + (end_pos[0] - start_pos[0]) * progress
+        current_y = start_pos[1] + (end_pos[1] - start_pos[1]) * progress
+        current_pos = (int(current_x), int(current_y))
+        
+        # Response visualization (different from signals)
+        response_color = self.colors['gold']
+        
+        # Response beam (dashed)
+        segments = 10
+        for i in range(segments):
+            if i % 2 == 0:  # Dashed effect
+                seg_start_x = start_pos[0] + (current_pos[0] - start_pos[0]) * (i / segments)
+                seg_start_y = start_pos[1] + (current_pos[1] - start_pos[1]) * (i / segments)
+                seg_end_x = start_pos[0] + (current_pos[0] - start_pos[0]) * ((i + 1) / segments)
+                seg_end_y = start_pos[1] + (current_pos[1] - start_pos[1]) * ((i + 1) / segments)
+                
+                pygame.draw.line(self.screen, response_color, 
+                               (int(seg_start_x), int(seg_start_y)), 
+                               (int(seg_end_x), int(seg_end_y)), 2)
+        
+        # Response pulse
+        pulse_radius = int(4 + abs(math.sin(current_time * 8)) * 2)
+        pygame.draw.circle(self.screen, response_color, current_pos, pulse_radius)
+        
+        # Response icon
+        response_text = self.font_small.render("📻", True, response_color)
+        self.screen.blit(response_text, (current_pos[0] - 8, current_pos[1] - 8))
+    
+    def _render_legend(self):
+        """Render legend explaining visual elements"""
+        legend_x = 870
+        legend_y = 750
+        legend_w = 350
+        legend_h = 200
+        
+        # Background
+        pygame.draw.rect(self.screen, self.colors['panel_bg'], (legend_x, legend_y, legend_w, legend_h))
+        pygame.draw.rect(self.screen, self.colors['accent'], (legend_x, legend_y, legend_w, legend_h), 2)
+        
+        title = self.font_large.render("🗺️ Legend", True, self.colors['accent'])
+        self.screen.blit(title, (legend_x + 10, legend_y + 10))
+        
+        legend_items = [
+            ("🚁", "Mobile Crisis Agent", self.colors['agent']),
+            ("📡", "Agent Signal", self.colors['neural']),
+            ("📻", "Command Response", self.colors['gold']),
+            ("🚨", "Active Crisis", self.colors['crisis']),
+            ("🏛️", "Command Centers", self.colors['gold']),
+            ("━━", "Movement Trail", self.colors['agent']),
+            ("▬▬", "Country Borders", self.colors['accent'])
+        ]
+        
+        y_offset = 40
+        for icon, description, color in legend_items:
+            icon_surface = self.font_medium.render(icon, True, color)
+            desc_surface = self.font_small.render(description, True, self.colors['text'])
+            
+            self.screen.blit(icon_surface, (legend_x + 15, legend_y + y_offset))
+            self.screen.blit(desc_surface, (legend_x + 40, legend_y + y_offset + 2))
+            
+            y_offset += 20
 
 def main():
     """Main function"""
