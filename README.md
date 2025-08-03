@@ -3,6 +3,8 @@
 
 A comprehensive reinforcement learning system for predicting and responding to humanitarian crises across African regions. This project implements and compares four state-of-the-art RL algorithms (DQN, PPO, A2C, REINFORCE) for optimal crisis intervention strategies.
 
+<img width="1039" height="660" alt="crisis_image" src="https://github.com/user-attachments/assets/bfe3f364-03b9-4b10-b65b-88b990738338" />
+
 ## Project Overview
 
 This system simulates crisis response scenarios across three African regions (Cameroon, DR Congo, Sudan) where AI agents learn to monitor conflict indicators, predict emerging crises, and coordinate international interventions to minimize humanitarian impact.
