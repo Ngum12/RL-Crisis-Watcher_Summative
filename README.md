@@ -3,7 +3,7 @@
 
 A comprehensive reinforcement learning system for predicting and responding to humanitarian crises across African regions. This project implements and compares four state-of-the-art RL algorithms (DQN, PPO, A2C, REINFORCE) for optimal crisis intervention strategies.
 
-<!-- Failed to upload "comprehensive_crisis_demo_20250803_080134.gif" -->
+![Demo](comprehensive_crisis_demo_20250803_080134.gif)
 
 ## Project Overview
 
