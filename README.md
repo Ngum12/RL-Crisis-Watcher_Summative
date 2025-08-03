@@ -33,6 +33,9 @@ A **revolutionary reinforcement learning system** that transforms crisis respons
 - **Automated video recording** and GIF generation
 - **Publication-quality charts** and statistical analysis
 
+![Mobile Agent Demo](results/mobile_agent_demo.gif)
+*🚁 Live demonstration of mobile crisis response agent navigating Africa road networks*
+
 #### 🔬 **Comprehensive Analysis Suite**
 - **Automated hyperparameter optimization** using Bayesian methods
 - **Statistical significance testing** with confidence intervals

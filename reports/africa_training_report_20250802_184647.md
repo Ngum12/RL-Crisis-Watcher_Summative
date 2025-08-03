@@ -86,6 +86,13 @@ This report presents the training results for four reinforcement learning algori
 
 ---
 
+## 🎬 Live Agent Demonstration
+
+![Mobile Agent Demo](../results/mobile_agent_demo.gif)
+*🚁 Live demonstration of trained neural networks controlling mobile crisis response agents in Africa*
+
+---
+
 ## 🌍 Real-World Impact Assessment
 
 ### Crisis Response Effectiveness
